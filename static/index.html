@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Playmax vs IMDB</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Playmax <span class="vs">vs</span> IMDB</h1>
+  <p class="subtitle">Compara las valoraciones de películas y series en ambas plataformas</p>
+  <div id="status-bar"></div>
+</header>
+
+<main>
+  <section class="controls">
+    <form id="search-form">
+      <input type="search" id="search-input" placeholder="Buscar película o serie…" minlength="2" autocomplete="off">
+      <button type="submit">Buscar</button>
+    </form>
+    <div class="filters">
+      <select id="filter-type">
+        <option value="">Todo el catálogo</option>
+        <option value="2">Películas</option>
+        <option value="1">Series</option>
+        <option value="3">Documentales</option>
+      </select>
+      <select id="filter-order">
+        <option value="9">Más populares</option>
+        <option value="6">Mejor valoradas</option>
+        <option value="1">Más nuevas</option>
+      </select>
+      <button id="explore-btn">Explorar</button>
+      <button id="mine-btn" class="alt">Mis fichas</button>
+    </div>
+  </section>
+
+  <section id="results" class="grid"></section>
+  <div class="pager">
+    <button id="more-btn" hidden>Cargar más</button>
+  </div>
+
+  <section id="myfichas" hidden>
+    <div class="my-controls">
+      <select id="my-group">
+        <option value="">Todo</option>
+        <option value="movie">Películas</option>
+        <option value="series">Series</option>
+        <option value="documentary">Documentales</option>
+      </select>
+      <select id="my-state">
+        <option value="">Cualquier estado</option>
+        <option value="following">Siguiendo</option>
+        <option value="pending">Pendientes</option>
+        <option value="favorite">Favoritas</option>
+        <option value="viewed">Vistas</option>
+        <option value="abandoned">Abandonadas</option>
+      </select>
+      <select id="my-series-status" style="display: none;">
+        <option value="">Todas las series</option>
+        <option value="finished">Finalizada</option>
+        <option value="waiting for new season">Esperando temporada</option>
+        <option value="in production">En producción</option>
+        <option value="cancelled">Cancelada</option>
+      </select>
+      <span id="my-progress"></span>
+      <span id="series-status-loading" style="display: none; font-size: 0.85rem; color: #f5c518;">⏳ Cargando estados...</span>
+      <button id="export-btn" class="alt">📥 Descargar Excel</button>
+    </div>
+    <div class="table-wrap">
+      <table id="my-table">
+        <thead><tr>
+          <th data-key="title">Título</th>
+          <th data-key="year">Año</th>
+          <th data-key="marked">Estado</th>
+          <th data-key="status">Estado serie</th>
+          <th data-key="myRating">Mi nota</th>
+          <th data-key="pm">Playmax</th>
+          <th data-key="imdb">IMDb</th>
+          <th data-key="diff">Dif.</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<dialog id="detail">
+  <button class="close" onclick="document.getElementById('detail').close()">✕</button>
+  <div id="detail-body"></div>
+</dialog>
+
+<script src="app.js"></script>
+</body>
+</html>
