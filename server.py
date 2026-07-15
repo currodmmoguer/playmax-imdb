@@ -330,6 +330,80 @@ def explore():
     })
 
 
+@app.route("/api/explore_imdb")
+def explore_imdb():
+    """Obtiene los mejores valorados de IMDb (ordenados por IMDb) con datos de Playmax."""
+    if not os.path.exists(IMDB_DB):
+        return jsonify({"fichas": [], "pagination": {}})
+
+    limit = int(request.args.get("limit", 24))
+    start = int(request.args.get("start", 0))
+    ficha_type = request.args.get("type")  # 1=Series, 2=Películas, 3=Documentales
+
+    conn = sqlite3.connect(IMDB_DB)
+    try:
+        # Obtener tconsts ordenados por rating de IMDb que existan en Playmax
+        # Buscamos más para compensar los que fallan al traer de Playmax o no coinciden con el filtro
+        rows = conn.execute("""
+            SELECT r.tconst, r.rating, r.votes, f.fichaId
+            FROM ratings r
+            INNER JOIN ficha_imdb f ON f.tconst = r.tconst
+            WHERE r.votes > 100 AND f.tconst != ''
+            ORDER BY r.rating DESC, r.votes DESC
+            LIMIT ? OFFSET ?
+        """, (limit * 3 + 20, start)).fetchall()
+
+        fichas = []
+        for tconst, rating, votes, ficha_id in rows:
+            if len(fichas) >= limit:
+                break
+            try:
+                # Obtener información de Playmax
+                pm_data = get_ficha(ficha_id).get("result", {}).get("info", {})
+                pm_type = pm_data.get("type", "")
+
+                # Mapeo de tipos para el filtro
+                type_map = {
+                    "Serie": "1",
+                    "Miniserie": "1",
+                    "Película": "2",
+                    "Documental": "3",
+                    "Serie de animación": "1",
+                }
+                pm_type_code = type_map.get(pm_type, "")
+
+                # Aplicar filtro de tipo si se especifica
+                if ficha_type and pm_type_code != ficha_type:
+                    continue
+
+                fichas.append({
+                    "id": ficha_id,
+                    "title": pm_data.get("title", f"[{ficha_id}]"),
+                    "type": pm_type,
+                    "year": pm_data.get("year"),
+                    "poster": pm_data.get("poster"),
+                    "rating": pm_data.get("rating"),
+                    "votes": pm_data.get("votes"),
+                    "imdbId": tconst,
+                    "imdbRating": rating,
+                    "imdbVotes": votes,
+                })
+            except Exception:
+                # Si falla traer de Playmax, saltar
+                pass
+
+        # Calcular si hay más resultados
+        # Para el siguiente inicio, añadir el límite
+        next_start = start + limit if len(fichas) >= limit else None
+
+        return jsonify({
+            "fichas": fichas[:limit],
+            "pagination": {"next": next_start} if next_start else {},
+        })
+    finally:
+        conn.close()
+
+
 _bg_resolving = threading.Lock()
 
 
@@ -505,6 +579,35 @@ def series_status():
             pass
         except Exception:
             pass
+    return jsonify(out)
+
+
+@app.route("/api/my_fichas_status", methods=["POST"])
+def my_fichas_status():
+    """Obtiene status de series del usuario en lotes, respetando throttle de API."""
+    STATUS_MAP = {
+        "finalized": "finished",
+        "emission": "in production",
+        "waiting for new season": "waiting for new season",
+        "cancelled": "cancelled",
+    }
+    ids = (request.get_json(silent=True) or {}).get("ids", [])
+    out = {}
+    # Procesar en lotes pequeños (máximo 5 series por lote)
+    # para no tardar demasiado: 5 series × 0.3s/serie ≈ 1.5s por lote
+    for i in range(0, len(ids), 5):
+        batch = ids[i:i+5]
+        for fid in batch:
+            try:
+                fid_int = int(fid)
+                data = get_ficha(fid_int)
+                info = data.get("result", {}).get("info", {})
+                status = info.get("status")
+                ficha_type = info.get("type")
+                if ficha_type == "Serie" and status:
+                    out[str(fid_int)] = STATUS_MAP.get(status, status)
+            except Exception:
+                pass
     return jsonify(out)
 
 

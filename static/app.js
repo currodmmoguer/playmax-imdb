@@ -81,10 +81,21 @@ async function explore(append = false) {
   if (!append) exploreStart = 0;
   const type = document.getElementById('filter-type').value;
   const order = document.getElementById('filter-order').value;
-  const q = new URLSearchParams({ order, start: exploreStart, limit: 24 });
-  if (type) q.set('type', type);
+
   try {
-    const data = await api(`/api/explore?${q}`);
+    let data;
+    if (order === 'imdb') {
+      // IMDb: mostrar mejor valoradas de IMDb (con datos de Playmax)
+      const q = new URLSearchParams({ start: exploreStart, limit: 24 });
+      if (type) q.set('type', type);
+      data = await api(`/api/explore_imdb?${q}`);
+      // Ya vienen con datos de Playmax, solo usar directamente
+    } else {
+      // Playmax: explore normal
+      const q = new URLSearchParams({ order, start: exploreStart, limit: 24 });
+      if (type) q.set('type', type);
+      data = await api(`/api/explore?${q}`);
+    }
     render(data.fichas, append);
     exploreStart = data.pagination?.next ?? exploreStart + 24;
     moreBtn.hidden = !data.fichas.length;
@@ -194,14 +205,20 @@ function renderMy() {
   const group = document.getElementById('my-group').value;
   const state = document.getElementById('my-state').value;
   const seriesStatus = document.getElementById('my-series-status').value;
-  let rows = myRows.filter(r =>
-    (!group || r.group === group) &&
-    (!state || r.marked === state) &&
-    (!seriesStatus || r.status === seriesStatus || (r.group === 'series' && !r.status)));
+  let rows = myRows.filter(r => {
+    if (group && r.group !== group) return false;
+    if (state && r.marked !== state) return false;
+    if (seriesStatus) {
+      // Filtrar por status de serie (aplica a series y documentales que son series)
+      const hasSeriesStatus = (r.group === 'series' || r.group === 'documentary') && r.status === seriesStatus;
+      return hasSeriesStatus;
+    }
+    return true;
+  });
 
   // Mostrar/ocultar select de status de series
   const statusSelect = document.getElementById('my-series-status');
-  statusSelect.style.display = group === 'series' || !group ? 'block' : 'none';
+  statusSelect.style.display = (group === 'series' || group === 'documentary' || !group) ? 'block' : 'none';
 
   const { key, dir } = mySort;
   rows.sort((a, b) => {
@@ -288,27 +305,34 @@ async function loadMyFichas() {
     renderMy();
     resolveImdb();
 
-    // Cargar status de series en background
+    // Cargar status de series en background (sin bloquear)
     const seriesIds = myRows.filter(r => r.group === 'series' && !r.status).map(r => r.id);
     if (seriesIds.length > 0) {
       const loadingEl = document.getElementById('series-status-loading');
       loadingEl.style.display = 'inline';
-      try {
-        const statusData = await api('/api/series-status', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ids: seriesIds }),
-        });
-        for (const [id, status] of Object.entries(statusData)) {
-          const row = myRows.find(r => r.id === Number(id));
-          if (row) row.status = status;
+
+      // Cargar en lotes de 5 para no abrumar la API
+      (async () => {
+        try {
+          for (let i = 0; i < seriesIds.length; i += 5) {
+            const batch = seriesIds.slice(i, i + 5);
+            const statusData = await api('/api/series-status', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ ids: batch }),
+            });
+            for (const [id, status] of Object.entries(statusData)) {
+              const row = myRows.find(r => r.id === Number(id));
+              if (row) row.status = status;
+            }
+            renderMy();
+          }
+        } catch (e) {
+          console.error('Error cargando status de series:', e);
+        } finally {
+          loadingEl.style.display = 'none';
         }
-        renderMy();
-      } catch (e) {
-        // Ignorar error de status
-      } finally {
-        loadingEl.style.display = 'none';
-      }
+      })();
     }
   } catch (e) {
     tbody.innerHTML = `<tr><td colspan="8" class="empty">⚠ ${e.message}</td></tr>`;
@@ -345,7 +369,14 @@ async function exportFichas() {
 
 document.getElementById('mine-btn').addEventListener('click', loadMyFichas);
 document.getElementById('export-btn').addEventListener('click', exportFichas);
-document.getElementById('my-group').addEventListener('change', renderMy);
+document.getElementById('my-group').addEventListener('change', () => {
+  const group = document.getElementById('my-group').value;
+  // Limpiar filtro de estado de serie si no es Series ni Documentales
+  if (group && group !== 'series' && group !== 'documentary') {
+    document.getElementById('my-series-status').value = '';
+  }
+  renderMy();
+});
 document.getElementById('my-state').addEventListener('change', renderMy);
 document.getElementById('my-series-status').addEventListener('change', renderMy);
 document.querySelectorAll('#my-table th').forEach(th => {
