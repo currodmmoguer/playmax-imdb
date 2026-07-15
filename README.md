@@ -44,22 +44,38 @@ web muestra un botón **"Autorizar app"** que genera una nueva y abre la página
 de autorización de Playmax (también puedes autorizarla desde el Panel de
 Control → Aplicaciones autorizadas de tu cuenta).
 
+## Funcionalidades principales
+
+### Exploración del catálogo
+- **Por Playmax:** Ordena por popularidad, mejor valoradas o más nuevas según Playmax
+- **Por IMDb:** Ordena por mejor valoradas según IMDb (con datos visuales de Playmax)
+- Filtros por tipo: películas, series, documentales
+
+### "Mis fichas"
+- Ve todas tus fichas marcadas con sus valoraciones en ambas plataformas
+- Filtra por estado de marcado (siguiendo, pendiente, favorita, vista, abandonada)
+- Filtra por estado de serie (finalizada, esperando, en producción, cancelada)
+- Ordena por cualquier columna
+- Descarga tus fichas como Excel
+
 ## Endpoints del backend
 
 | Ruta | Descripción |
 |------|-------------|
 | `GET /api/status` | Estado de la conexión con Playmax y del dataset de IMDb |
 | `GET /api/search?q=` | Busca fichas en Playmax |
-| `GET /api/explore?type=&order=&start=` | Navega el catálogo (tipo: 1 series, 2 películas, 3 documentales; orden: 9 populares, 6 mejor valoradas, 1 nuevas) |
+| `GET /api/explore?type=&order=&start=` | Navega por Playmax (tipo: 1 series, 2 películas, 3 documentales; orden: 9 populares, 6 mejor valoradas, 1 nuevas) |
+| `GET /api/explore_imdb?type=&start=` | Navega por IMDb ordenadas por rating (tipo: 1 series, 2 películas, 3 documentales) |
 | `GET /api/ficha/<id>` | Detalle de la ficha + valoración IMDb + diferencia |
-| `GET /api/my_fichas` | Tus fichas marcadas (todas las secciones) con valoración IMDb si ya está resuelta |
+| `GET /api/my_fichas` | Tus fichas marcadas (todas las secciones) con valoración IMDb |
+| `POST /api/series-status` | Estado actual de series (`{"ids": [...]}`) |
 | `POST /api/imdb/resolve` | Resuelve el imdbId de hasta 15 fichas (`{"ids": [...]}`) y persiste el mapeo |
 | `POST /api/imdb/update` | Vuelve a descargar el dataset de IMDb |
 
-La vista **"Mis fichas"** resuelve los IDs de IMDb progresivamente (1 llamada
-a Playmax por ficha, respetando el límite). El mapeo ficha↔IMDb se guarda en
-SQLite, así que solo es lento la primera vez (~8 min para ~860 fichas);
-después la tabla carga al instante.
+### Rendimiento
+- **Mapeo IMDb:** La primera vez tarda (~8 min para ~860 fichas). Después carga al instante.
+- **Estados de serie:** Se cargan en background en lotes de 5 sin bloquear la UI
+- Las fichas se cachean en memoria durante 1 hora para no agotar el límite de Playmax
 
 ## Límites de la API de Playmax
 
