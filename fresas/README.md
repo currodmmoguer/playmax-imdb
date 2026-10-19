@@ -7,24 +7,90 @@ campo de tratamientos fitosanitarios.
 
 Es independiente del comparador Playmax/IMDb del resto del repositorio
 (Flask + SQLite + HTML/JS sin dependencias), pensada para correr en la misma
-Raspberry Pi y usarse desde el móvil en el campo.
+Raspberry Pi y usarse desde el móvil en el campo, con usuarios y acceso
+seguro (HTTPS) desde cualquier sitio.
 
-## Puesta en marcha
+## Desplegar en la Raspberry Pi (acceso desde cualquier sitio)
+
+Copia el repositorio a la Raspberry y, desde la carpeta `fresas`:
+
+```bash
+bash deploy/instalar.sh
+```
+
+El script crea el entorno de Python, instala la app como servicio `fresas`
+(arranca sola al encender la Raspberry) y te pide el usuario y la contraseña
+del primer administrador. El servicio solo escucha en `127.0.0.1:5001`: no
+se puede entrar directamente por la red, solo a través del túnel HTTPS.
+
+### Publicarla con HTTPS: Tailscale Funnel (recomendado)
+
+Es gratis, no hace falta comprar dominio ni abrir puertos en el router, y el
+certificado HTTPS se renueva solo.
+
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up            # abre el enlace que aparece e inicia sesión
+sudo tailscale funnel --bg 5001
+```
+
+La primera vez, `tailscale funnel` te da un enlace para activar Funnel en tu
+cuenta. Al terminar muestra la dirección pública, del tipo
+`https://raspberrypi.tu-red.ts.net`: esa es la que abres desde el móvil, en el
+campo o en casa. En el móvil puedes «Añadir a pantalla de inicio» para tenerla
+como una app.
+
+### Alternativa: Cloudflare Tunnel
+
+Si tienes un dominio propio en Cloudflare, puedes publicarla en p. ej.
+`https://fresas.tudominio.es` con un túnel de Cloudflare (Zero Trust →
+Networks → Tunnels) apuntando a `http://localhost:5001`. La app funciona igual
+detrás de cualquier proxy HTTPS.
+
+### Mantenimiento
+
+```bash
+sudo systemctl status fresas         # ¿está funcionando?
+sudo journalctl -u fresas -n 50      # últimos mensajes
+git pull && sudo systemctl restart fresas   # actualizar
+```
+
+**Copia de seguridad:** toda la información está en `fresas/data/fresas.db`.
+Cópiala con regularidad fuera de la Raspberry (p. ej.
+`sqlite3 data/fresas.db ".backup copia.db"`). En `data/secret_key` está la
+clave que firma las sesiones: si la borras, todo el mundo tendrá que volver a
+entrar.
+
+## Usuarios y seguridad
+
+- Para entrar hace falta usuario y contraseña. Hay dos roles:
+  **Usuario** (registra y consulta datos) y **Administrador** (además da de
+  alta usuarios, cambia roles, restablece contraseñas y da de baja).
+- Los administradores gestionan los usuarios en la pestaña **Usuarios**; cada
+  uno puede cambiar su contraseña en **Mi cuenta**.
+- Si se pierde la contraseña del administrador, se restablece en la
+  Raspberry con `./venv/bin/python server.py crear-admin <usuario>`.
+- Contraseñas guardadas con hash (scrypt), mínimo 8 caracteres.
+- Tras 5 intentos fallidos de entrar, ese usuario queda bloqueado 15 minutos
+  desde esa conexión.
+- La sesión dura 30 días en cada dispositivo. Al cambiar o restablecer la
+  contraseña, o al dar de baja a un usuario, se cierran sus sesiones abiertas.
+- Cookie de sesión `HttpOnly`, `SameSite` y `Secure` (en producción), cabecera
+  anti-CSRF obligatoria y cabeceras de seguridad (CSP, HSTS, anti-iframe).
+
+## Desarrollo en local
 
 ```bash
 cd fresas
 python3 -m venv venv
-./venv/bin/pip install flask openpyxl
+./venv/bin/pip install -r requirements.txt
+./venv/bin/python server.py crear-admin admin
 ./venv/bin/python server.py
 ```
 
-Abre <http://localhost:5001> (o `http://<ip-de-la-raspberry>:5001`). El puerto
-se cambia con la variable `PORT`. Los datos se guardan en `fresas/data/fresas.db`
-(excluido de git; haz copia de ese fichero).
-
-La primera vez la app te lleva a **Fincas**: da de alta la finca, después sus
-**Sectores** (variedad, hectáreas, nº de plantas, fecha de plantación) y los
-**Trabajadores**.
+Abre <http://localhost:5001>. En local se usa HTTP; en producción
+`FRESAS_HTTPS=1` y `FRESAS_PROXY=1` (los pone el servicio) activan la cookie
+segura y la lectura de la IP real a través del túnel.
 
 ## Funcionalidades
 
@@ -61,8 +127,14 @@ recogida de diciembre/enero a junio): la campaña 2026/27 va del 1-9-2026 al
 
 ## Endpoints del backend
 
+Las peticiones que modifican datos deben llevar la cabecera
+`X-Requested-With: fresas`.
+
 | Ruta | Descripción |
 |------|-------------|
+| `POST /api/login` · `POST /api/logout` · `GET /api/me` | Sesión (todas las demás rutas exigen haber entrado) |
+| `POST /api/me/password` | Cambiar la propia contraseña (`{"actual", "nueva"}`) |
+| `GET/POST /api/usuarios` · `PUT /api/usuarios/<id>` | Gestión de usuarios (solo administradores) |
 | `GET /api/meta` | Categorías, campañas con datos y campaña actual |
 | `GET /api/<tabla>?campana=` | Lista registros (`fincas`, `sectores`, `trabajadores`, `recolecciones`, `entregas`, `tratamientos`) |
 | `POST /api/<tabla>` | Crea un registro. En `recolecciones` devuelve 409 si hay plazo de seguridad en vigor, salvo que se envíe `"forzar": true` |

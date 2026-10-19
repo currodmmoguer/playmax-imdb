@@ -6,15 +6,19 @@ const alertas = document.getElementById('alertas');
 let currentTab = 'resumen';
 let editingId = null;
 let meta = { categorias: [] };
+let me = null;
 const cache = { fincas: [], sectores: [], trabajadores: [] };
 
 async function api(path, opts = {}) {
+  // La cabecera X-Requested-With es la protección CSRF que exige el servidor.
+  opts.headers = { 'X-Requested-With': 'fresas' };
   if (opts.body && typeof opts.body !== 'string') {
     opts.body = JSON.stringify(opts.body);
-    opts.headers = { 'Content-Type': 'application/json' };
+    opts.headers['Content-Type'] = 'application/json';
   }
   const r = await fetch(path, opts);
   const data = await r.json();
+  if (r.status === 401 && data.login && path !== '/api/login') showLogin();
   if (!r.ok) {
     const err = new Error(data.error || `Error HTTP ${r.status}`);
     err.status = r.status;
@@ -157,7 +161,26 @@ const SCREENS = {
       ['Estado', r => r.activo ? '<span class="ok">activo</span>' : 'baja'],
     ],
   },
+  usuarios: {
+    title: 'Usuario de la aplicación',
+    noDelete: true, // se dan de baja desmarcando «Activo»
+    fields: [
+      { name: 'usuario', label: 'Usuario', type: 'text', required: true },
+      { name: 'nombre', label: 'Nombre', type: 'text' },
+      { name: 'rol', label: 'Rol', type: 'rol', required: true },
+      { name: 'password', label: 'Contraseña (mín. 8)', editLabel: 'Nueva contraseña (vacío = no cambiar)',
+        type: 'password', requiredNew: true, noFill: true },
+      { name: 'activo', label: 'Activo', type: 'checkbox', default: () => true },
+    ],
+    columns: [
+      ['Usuario', r => esc(r.usuario)], ['Nombre', r => esc(r.nombre)],
+      ['Rol', r => r.rol === 'admin' ? 'Administrador' : 'Usuario'],
+      ['Estado', r => r.activo ? '<span class="ok">activo</span>' : 'baja'],
+    ],
+  },
 };
+
+const SELECT_TYPES = ['categoria', 'finca', 'sector', 'trabajador', 'rol'];
 
 const DATALISTS = {
   variedades: VARIEDADES,
@@ -174,6 +197,7 @@ function optionsFor(f) {
   const opt = (v, t) => `<option value="${v}">${esc(t)}</option>`;
   const blank = f.required ? '<option value="">— elige —</option>' : '<option value="">—</option>';
   if (f.type === 'categoria') return meta.categorias.map(c => opt(c, c)).join('');
+  if (f.type === 'rol') return opt('usuario', 'Usuario (registra datos)') + opt('admin', 'Administrador (también gestiona usuarios)');
   if (f.type === 'finca') return blank + cache.fincas.map(x => opt(x.id, x.nombre)).join('');
   if (f.type === 'sector') return blank + cache.sectores.map(x => opt(x.id, nombreSector(x.id) +
     (x.variedad ? ` (${x.variedad})` : ''))).join('');
@@ -186,9 +210,11 @@ function optionsFor(f) {
 function renderForm(screen, values = {}) {
   const lists = new Set();
   const inputs = screen.fields.map(f => {
-    const req = f.required ? 'required' : '';
+    const required = f.required || (f.requiredNew && !editingId);
+    const req = required ? 'required' : '';
+    const label = editingId && f.editLabel ? f.editLabel : f.label;
     let input;
-    if (['categoria', 'finca', 'sector', 'trabajador'].includes(f.type)) {
+    if (SELECT_TYPES.includes(f.type)) {
       input = `<select name="${f.name}" ${req}>${optionsFor(f)}</select>`;
     } else if (f.type === 'checkbox') {
       input = `<input type="checkbox" name="${f.name}">`;
@@ -196,9 +222,10 @@ function renderForm(screen, values = {}) {
       if (f.list) lists.add(f.list);
       input = `<input type="${f.type}" name="${f.name}" ${req}
         ${f.step ? `step="${f.step}" min="0" inputmode="decimal"` : ''}
-        ${f.list ? `list="dl-${f.list}"` : ''} placeholder="${esc(f.placeholder || '')}">`;
+        ${f.list ? `list="dl-${f.list}"` : ''} placeholder="${esc(f.placeholder || '')}"
+        ${f.type === 'password' ? `minlength="8" autocomplete="new-password"` : ''}>`;
     }
-    return `<label class="${f.type === 'checkbox' ? 'check' : ''}">${esc(f.label)}${f.required ? ' *' : ''}${input}</label>`;
+    return `<label class="${f.type === 'checkbox' ? 'check' : ''}">${esc(label)}${required ? ' *' : ''}${input}</label>`;
   }).join('');
   const datalists = [...lists].map(l =>
     `<datalist id="dl-${l}">${DATALISTS[l].map(v => `<option value="${esc(v)}">`).join('')}</datalist>`).join('');
@@ -211,6 +238,7 @@ function renderForm(screen, values = {}) {
     <p class="msg" id="form-msg"></p>`;
   for (const f of screen.fields) {
     const el = form.elements[f.name];
+    if (f.noFill) continue;
     const v = f.name in values ? values[f.name] : f.default?.();
     if (f.type === 'checkbox') el.checked = !!v;
     else if (v != null) el.value = v;
@@ -265,6 +293,8 @@ async function save(data) {
   // Para meter muchos registros seguidos se conservan fecha, sector, etc.
   const kept = Object.fromEntries((screen.keep || []).map(k => [k, data[k]]));
   if (cache[currentTab]) await loadCache();
+  if (currentTab === 'usuarios') await loadMe();
+  if (currentTab === 'usuarios' && me.rol !== 'admin') return showTab('resumen');
   await loadList();
   renderForm(screen, wasEditing ? {} : kept);
   formMsg(wasEditing ? 'Cambios guardados.' : 'Registro añadido.', 'ok');
@@ -289,7 +319,7 @@ async function loadList() {
   const body = rowsCache.map(r => `<tr>${screen.columns.map(([, fn, c]) =>
     `<td class="${c || ''}">${fn(r)}</td>`).join('')}
     <td class="row-actions"><button class="link" data-edit="${r.id}">Editar</button>
-    <button class="link bad" data-del="${r.id}">Borrar</button></td></tr>`).join('');
+    ${screen.noDelete ? '' : `<button class="link bad" data-del="${r.id}">Borrar</button>`}</td></tr>`).join('');
   lista.innerHTML = (screen.total ? `<p class="total">${screen.total(rowsCache)}</p>` : '') +
     `<div class="scroll"><table><thead><tr>${head}<th></th></tr></thead><tbody>${body}</tbody></table></div>`;
 }
@@ -389,10 +419,12 @@ async function showTab(tab) {
   editingId = null;
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.getElementById('tab-resumen').hidden = tab !== 'resumen';
-  document.getElementById('tab-crud').hidden = tab === 'resumen';
+  document.getElementById('tab-cuenta').hidden = tab !== 'cuenta';
+  document.getElementById('tab-crud').hidden = !SCREENS[tab];
   try {
     await loadAlertas();
     if (tab === 'resumen') return await loadResumen();
+    if (tab === 'cuenta') return;
     const screen = SCREENS[tab];
     await loadList();
     renderForm(screen);
@@ -408,11 +440,75 @@ document.getElementById('tabs').addEventListener('click', e => {
 });
 campanaSel.addEventListener('change', () => showTab(currentTab));
 
-(async function init() {
+// ---------------------------------------------------------------- sesión
+
+const loginView = document.getElementById('login-view');
+const appView = document.getElementById('app-view');
+const loginForm = document.getElementById('login-form');
+
+function showLogin() {
+  me = null;
+  appView.hidden = true;
+  loginView.hidden = false;
+  loginForm.elements.usuario.focus();
+}
+
+async function loadMe() {
+  me = await api('/api/me');
+  document.getElementById('user-name').textContent = me.nombre || me.usuario;
+  document.querySelectorAll('[data-admin]').forEach(el => el.hidden = me.rol !== 'admin');
+}
+
+loginForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  const msg = document.getElementById('login-msg');
+  msg.textContent = '';
+  try {
+    await api('/api/login', { method: 'POST', body: {
+      usuario: loginForm.elements.usuario.value, password: loginForm.elements.password.value } });
+    loginForm.reset();
+    await start();
+  } catch (err) {
+    msg.textContent = err.message;
+  }
+});
+
+document.getElementById('logout').addEventListener('click', async () => {
+  await api('/api/logout', { method: 'POST' }).catch(() => {});
+  showLogin();
+});
+
+const passwordForm = document.getElementById('password-form');
+passwordForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  const el = passwordForm.elements;
+  const msg = document.getElementById('password-msg');
+  if (el.nueva.value !== el.repite.value) {
+    msg.className = 'msg bad';
+    msg.textContent = 'Las contraseñas nuevas no coinciden.';
+    return;
+  }
+  try {
+    await api('/api/me/password', { method: 'POST', body: { actual: el.actual.value, nueva: el.nueva.value } });
+    passwordForm.reset();
+    msg.className = 'msg ok';
+    msg.textContent = 'Contraseña cambiada. Las demás sesiones abiertas se han cerrado.';
+  } catch (err) {
+    msg.className = 'msg bad';
+    msg.textContent = err.message;
+  }
+});
+
+async function start() {
+  await loadMe();
+  loginView.hidden = true;
+  appView.hidden = false;
   meta = await api('/api/meta');
   campanaSel.innerHTML = meta.campanas.map(c => `<option>${c}</option>`).join('');
   campanaSel.value = meta.campana_actual;
   await loadCache();
   // Sin fincas todavía: empezar por darlas de alta.
   await showTab(cache.fincas.length ? 'resumen' : 'fincas');
-})();
+}
+
+start().catch(() => {});

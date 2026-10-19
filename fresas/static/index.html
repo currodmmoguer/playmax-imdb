@@ -4,49 +4,82 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Fresas — Campaña</title>
+  <link rel="icon" href="favicon.svg">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
-    <h1>🍓 Fresas <span class="sub">gestión de campaña</span></h1>
-    <label class="campana">Campaña
-      <select id="campana"></select>
-    </label>
-  </header>
+  <section id="login-view" hidden>
+    <form id="login-form" class="card login">
+      <h1>🍓 Fresas</h1>
+      <p class="sub">Gestión de campaña</p>
+      <label>Usuario<input name="usuario" autocomplete="username" autocapitalize="none" required></label>
+      <label>Contraseña<input name="password" type="password" autocomplete="current-password" required></label>
+      <button type="submit">Entrar</button>
+      <p class="msg bad" id="login-msg"></p>
+    </form>
+  </section>
 
-  <nav id="tabs">
-    <button data-tab="resumen" class="active">Resumen</button>
-    <button data-tab="recolecciones">Recolección</button>
-    <button data-tab="entregas">Entregas</button>
-    <button data-tab="tratamientos">Cuaderno de campo</button>
-    <button data-tab="sectores">Sectores</button>
-    <button data-tab="fincas">Fincas</button>
-    <button data-tab="trabajadores">Trabajadores</button>
-  </nav>
-
-  <main>
-    <div id="alertas"></div>
-
-    <section id="tab-resumen" class="tab">
-      <div id="kpis" class="kpis"></div>
-      <div class="grid2">
-        <div class="card"><h3>Kg recolectados por semana</h3><div id="chart-semana"></div></div>
-        <div class="card"><h3>Kg por categoría</h3><div id="chart-categoria"></div></div>
+  <div id="app-view" hidden>
+    <header>
+      <h1>🍓 Fresas <span class="sub">gestión de campaña</span></h1>
+      <div class="header-right">
+        <label class="campana">Campaña
+          <select id="campana"></select>
+        </label>
+        <span id="user-name"></span>
+        <button id="logout" class="ghost">Salir</button>
       </div>
-      <div class="card"><h3>Rendimiento por sector</h3><div id="tabla-sectores"></div></div>
-      <div class="card"><h3>Trabajadores</h3><div id="tabla-trabajadores"></div></div>
-      <div class="card"><h3>Liquidación de entregas</h3><div id="tabla-entregas"></div></div>
-      <div class="actions">
-        <a class="btn" id="export-campana" href="#">Descargar campaña (Excel)</a>
-      </div>
-    </section>
+    </header>
 
-    <section id="tab-crud" class="tab" hidden>
-      <form id="form" class="card form"></form>
-      <div class="actions" id="crud-actions"></div>
-      <div class="card"><div id="lista"></div></div>
-    </section>
-  </main>
+    <nav id="tabs">
+      <button data-tab="resumen" class="active">Resumen</button>
+      <button data-tab="recolecciones">Recolección</button>
+      <button data-tab="entregas">Entregas</button>
+      <button data-tab="tratamientos">Cuaderno de campo</button>
+      <button data-tab="sectores">Sectores</button>
+      <button data-tab="fincas">Fincas</button>
+      <button data-tab="trabajadores">Trabajadores</button>
+      <button data-tab="usuarios" data-admin hidden>Usuarios</button>
+      <button data-tab="cuenta">Mi cuenta</button>
+    </nav>
+
+    <main>
+      <div id="alertas"></div>
+
+      <section id="tab-resumen" class="tab">
+        <div id="kpis" class="kpis"></div>
+        <div class="grid2">
+          <div class="card"><h3>Kg recolectados por semana</h3><div id="chart-semana"></div></div>
+          <div class="card"><h3>Kg por categoría</h3><div id="chart-categoria"></div></div>
+        </div>
+        <div class="card"><h3>Rendimiento por sector</h3><div id="tabla-sectores"></div></div>
+        <div class="card"><h3>Trabajadores</h3><div id="tabla-trabajadores"></div></div>
+        <div class="card"><h3>Liquidación de entregas</h3><div id="tabla-entregas"></div></div>
+        <div class="actions">
+          <a class="btn" id="export-campana" href="#">Descargar campaña (Excel)</a>
+        </div>
+      </section>
+
+      <section id="tab-crud" class="tab" hidden>
+        <form id="form" class="card form"></form>
+        <div class="actions" id="crud-actions"></div>
+        <div class="card"><div id="lista"></div></div>
+      </section>
+
+      <section id="tab-cuenta" class="tab" hidden>
+        <form id="password-form" class="card form">
+          <h3>Cambiar mi contraseña</h3>
+          <div class="fields">
+            <label>Contraseña actual<input name="actual" type="password" autocomplete="current-password" required></label>
+            <label>Nueva contraseña (mín. 8)<input name="nueva" type="password" autocomplete="new-password" minlength="8" required></label>
+            <label>Repite la nueva<input name="repite" type="password" autocomplete="new-password" minlength="8" required></label>
+          </div>
+          <div class="form-buttons"><button type="submit">Cambiar contraseña</button></div>
+          <p class="msg" id="password-msg"></p>
+        </form>
+      </section>
+    </main>
+  </div>
 
   <script src="app.js"></script>
 </body>
