@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fresas — Campaña</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>🍓 Fresas <span class="sub">gestión de campaña</span></h1>
+    <label class="campana">Campaña
+      <select id="campana"></select>
+    </label>
+  </header>
+
+  <nav id="tabs">
+    <button data-tab="resumen" class="active">Resumen</button>
+    <button data-tab="recolecciones">Recolección</button>
+    <button data-tab="entregas">Entregas</button>
+    <button data-tab="tratamientos">Cuaderno de campo</button>
+    <button data-tab="sectores">Sectores</button>
+    <button data-tab="fincas">Fincas</button>
+    <button data-tab="trabajadores">Trabajadores</button>
+  </nav>
+
+  <main>
+    <div id="alertas"></div>
+
+    <section id="tab-resumen" class="tab">
+      <div id="kpis" class="kpis"></div>
+      <div class="grid2">
+        <div class="card"><h3>Kg recolectados por semana</h3><div id="chart-semana"></div></div>
+        <div class="card"><h3>Kg por categoría</h3><div id="chart-categoria"></div></div>
+      </div>
+      <div class="card"><h3>Rendimiento por sector</h3><div id="tabla-sectores"></div></div>
+      <div class="card"><h3>Trabajadores</h3><div id="tabla-trabajadores"></div></div>
+      <div class="card"><h3>Liquidación de entregas</h3><div id="tabla-entregas"></div></div>
+      <div class="actions">
+        <a class="btn" id="export-campana" href="#">Descargar campaña (Excel)</a>
+      </div>
+    </section>
+
+    <section id="tab-crud" class="tab" hidden>
+      <form id="form" class="card form"></form>
+      <div class="actions" id="crud-actions"></div>
+      <div class="card"><div id="lista"></div></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
