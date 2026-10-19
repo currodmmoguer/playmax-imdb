@@ -31,8 +31,8 @@ DATA_DIR = os.path.join(BASE_DIR, "data")
 DB_PATH = os.environ.get("FRESAS_DB", os.path.join(DATA_DIR, "fresas.db"))
 SECRET_KEY_FILE = os.path.join(DATA_DIR, "secret_key")
 
-# En producción la app va detrás de un proxy HTTPS (Tailscale Funnel,
-# Cloudflare Tunnel, Caddy…): FRESAS_HTTPS=1 marca la cookie de sesión como
+# En producción la app va detrás de un proxy HTTPS (Tailscale serve en
+# la red privada, Caddy…): FRESAS_HTTPS=1 marca la cookie de sesión como
 # Secure y FRESAS_PROXY=1 confía en las cabeceras X-Forwarded-* de ese proxy.
 HTTPS = os.environ.get("FRESAS_HTTPS") == "1"
 BEHIND_PROXY = os.environ.get("FRESAS_PROXY") == "1"

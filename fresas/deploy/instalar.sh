@@ -61,12 +61,15 @@ systemctl --no-pager --lines=0 status fresas || true
 cat <<MSG
 
 Listo: la app corre en http://127.0.0.1:$PORT (solo desde la propia Raspberry).
-Para abrirla desde cualquier sitio con HTTPS, publícala con Tailscale Funnel:
+Para usarla desde tu móvil sin abrir la Raspberry a Internet, crea una red
+privada con Tailscale:
 
   curl -fsSL https://tailscale.com/install.sh | sh
   sudo tailscale up
-  sudo tailscale funnel --bg $PORT
+  sudo tailscale serve --bg $PORT
 
-La última orden te da la dirección https://<raspberry>.<tu-red>.ts.net
-(ver README.md, sección «Desplegar»).
+Después instala Tailscale en el móvil con la misma cuenta y abre la dirección
+https://<raspberry>.<tu-red>.ts.net que muestra «tailscale serve».
+No uses «tailscale funnel»: eso sí la publicaría en Internet.
+(Ver README.md, sección «Desplegar».)
 MSG

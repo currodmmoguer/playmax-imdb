@@ -8,9 +8,10 @@ campo de tratamientos fitosanitarios.
 Es independiente del comparador Playmax/IMDb del resto del repositorio
 (Flask + SQLite + HTML/JS sin dependencias), pensada para correr en la misma
 Raspberry Pi y usarse desde el móvil en el campo, con usuarios y acceso
-seguro (HTTPS) desde cualquier sitio.
+desde cualquier sitio por una red privada (Tailscale), sin abrir la Raspberry
+a Internet.
 
-## Desplegar en la Raspberry Pi (acceso desde cualquier sitio)
+## Desplegar en la Raspberry Pi (red privada, sin abrirla a Internet)
 
 Copia el repositorio a la Raspberry y, desde la carpeta `fresas`:
 
@@ -20,32 +21,41 @@ bash deploy/instalar.sh
 
 El script crea el entorno de Python, instala la app como servicio `fresas`
 (arranca sola al encender la Raspberry) y te pide el usuario y la contraseña
-del primer administrador. El servicio solo escucha en `127.0.0.1:5001`: no
-se puede entrar directamente por la red, solo a través del túnel HTTPS.
+del primer administrador. El servicio solo escucha en `127.0.0.1:5001`: ni
+siquiera se puede entrar desde la red de casa, solo a través de Tailscale.
 
-### Publicarla con HTTPS: Tailscale Funnel (recomendado)
+### Acceso privado con Tailscale
 
-Es gratis, no hace falta comprar dominio ni abrir puertos en el router, y el
-certificado HTTPS se renueva solo.
+[Tailscale](https://tailscale.com) crea una red privada cifrada entre tus
+dispositivos. **La Raspberry no queda expuesta a Internet**: no se abren
+puertos en el router y nadie fuera de tu red privada puede ni ver que existe.
 
-```bash
-curl -fsSL https://tailscale.com/install.sh | sh
-sudo tailscale up            # abre el enlace que aparece e inicia sesión
-sudo tailscale funnel --bg 5001
-```
+1. En la Raspberry:
 
-La primera vez, `tailscale funnel` te da un enlace para activar Funnel en tu
-cuenta. Al terminar muestra la dirección pública, del tipo
-`https://raspberrypi.tu-red.ts.net`: esa es la que abres desde el móvil, en el
-campo o en casa. En el móvil puedes «Añadir a pantalla de inicio» para tenerla
-como una app.
+   ```bash
+   curl -fsSL https://tailscale.com/install.sh | sh
+   sudo tailscale up                 # abre el enlace que aparece e inicia sesión
+   sudo tailscale serve --bg 5001    # HTTPS solo dentro de tu red privada
+   ```
 
-### Alternativa: Cloudflare Tunnel
+   `tailscale serve` muestra la dirección, del tipo
+   `https://raspberrypi.tu-red.ts.net`. La primera vez puede pedirte que
+   actives los certificados HTTPS en tu cuenta (te da el enlace).
 
-Si tienes un dominio propio en Cloudflare, puedes publicarla en p. ej.
-`https://fresas.tudominio.es` con un túnel de Cloudflare (Zero Trust →
-Networks → Tunnels) apuntando a `http://localhost:5001`. La app funciona igual
-detrás de cualquier proxy HTTPS.
+2. En tu móvil y tu ordenador: instala la app de Tailscale, entra con la misma
+   cuenta y abre esa dirección. En el móvil puedes «Añadir a pantalla de
+   inicio» para tenerla como una app.
+
+3. Para que entre otra persona: en el panel de Tailscale
+   (<https://login.tailscale.com/admin/machines>) usa **Share** en la
+   Raspberry e invítala por correo. Esa persona instala Tailscale con su propia
+   cuenta y solo podrá llegar a la Raspberry, no al resto de tus
+   dispositivos. Además necesita su usuario de la app (pestaña **Usuarios**).
+   Para quitarle el acceso, deja de compartir la máquina y dale de baja en la app.
+
+> ⚠️ No uses `tailscale funnel`: ese comando sí la publica en Internet. Para
+> comprobar que no está activo: `tailscale funnel status` (si lo estuviera,
+> `sudo tailscale funnel reset`).
 
 ### Mantenimiento
 
@@ -90,7 +100,7 @@ python3 -m venv venv
 
 Abre <http://localhost:5001>. En local se usa HTTP; en producción
 `FRESAS_HTTPS=1` y `FRESAS_PROXY=1` (los pone el servicio) activan la cookie
-segura y la lectura de la IP real a través del túnel.
+segura y la lectura de la IP real a través de Tailscale.
 
 ## Funcionalidades
 
