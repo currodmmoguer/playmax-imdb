@@ -20,3 +20,6 @@ __pycache__/
 .idea/
 *.swp
 *.swo
+
+# Node
+node_modules/
