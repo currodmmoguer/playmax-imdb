@@ -58,14 +58,27 @@ async function authorizeApp() {
 
 // ---------------------------------------------------------------- listados
 
+const SERIES_STATUS_LABELS = {
+  'finished': '✓ Finalizada',
+  'waiting for new season': '⏳ Esperando temporada',
+  'in production': '🎬 En producción',
+  'cancelled': '✕ Cancelada',
+};
+
+function seriesStatusLabel(status) {
+  return status ? (SERIES_STATUS_LABELS[status] || status) : null;
+}
+
 function fichaCard(f) {
   const rating = f.rating ? Number(f.rating).toFixed(1) : '—';
+  const status = seriesStatusLabel(f.status);
   return `<article class="card" onclick="openDetail(${f.id})">
     <img loading="lazy" src="${f.poster || ''}" alt="" onerror="this.style.visibility='hidden'">
     <div class="card-info">
       <h3>${f.title}</h3>
       <p>${f.type || ''} ${f.year ? '· ' + f.year : ''}</p>
       <p class="pm-rating">★ ${rating} <small>(${f.votes ?? 0} votos en Playmax)</small></p>
+      ${status ? `<p class="series-status">${status}</p>` : ''}
     </div>
   </article>`;
 }
@@ -242,13 +255,7 @@ function renderMy() {
     const imdbCell = r.imdb
       ? fmt(r.imdb.rating)
       : r.resolved ? '<span class="muted">—</span>' : '<span class="muted">…</span>';
-    const statusLabel = r.status
-      ? r.status === 'finished' ? '✓ Finalizada'
-      : r.status === 'waiting for new season' ? '⏳ Esperando'
-      : r.status === 'in production' ? '🎬 En prod.'
-      : r.status === 'cancelled' ? '✕ Cancelada'
-      : r.status
-      : '—';
+    const statusLabel = seriesStatusLabel(r.status) || '—';
     return `<tr onclick="openDetail(${r.id})">
       <td class="t-title"><img loading="lazy" src="${r.poster || ''}" alt=""> ${r.title}
         <small>${r.type || ''}</small></td>
