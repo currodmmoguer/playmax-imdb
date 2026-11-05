@@ -27,6 +27,14 @@ IMDB_RATINGS_URL = "https://datasets.imdbws.com/title.ratings.tsv.gz"
 PLAYMAX_BASE = "https://playmax.mx/api/json/get/{page}/{version}/{key}/"
 IMDB_TT_RE = re.compile(r"tt\d+")
 
+# Estado de serie: valores de Playmax -> valores que espera el frontend
+SERIES_STATUS_MAP = {
+    "finalized": "finished",
+    "emission": "in production",
+    "waiting for new season": "waiting for new season",
+    "cancelled": "cancelled",
+}
+
 
 def load_env():
     path = os.path.join(BASE_DIR, ".env")
@@ -387,6 +395,11 @@ def explore_imdb():
                     "imdbId": tconst,
                     "imdbRating": rating,
                     "imdbVotes": votes,
+                    # Estado solo para series (la ficha ya está en caché)
+                    "status": (SERIES_STATUS_MAP.get(pm_data.get("status"),
+                                                     pm_data.get("status"))
+                               if pm_type_code == "1" and pm_data.get("status")
+                               else None),
                 })
             except Exception:
                 # Si falla traer de Playmax, saltar
@@ -556,13 +569,6 @@ def ficha(ficha_id):
 @app.route("/api/series-status", methods=["POST"])
 def series_status():
     """Obtiene el status de varias series. Recibe: {"ids": [1,2,3,...]}"""
-    # Mapeo de valores de Playmax a valores esperados por el frontend
-    STATUS_MAP = {
-        "finalized": "finished",
-        "emission": "in production",
-        "waiting for new season": "waiting for new season",
-        "cancelled": "cancelled",
-    }
     ids = (request.get_json(silent=True) or {}).get("ids", [])
     out = {}
     for fid in ids:
@@ -574,7 +580,7 @@ def series_status():
             ficha_type = info.get("type")
             # Mapear el status a valores del frontend
             if ficha_type == "Serie" and status:
-                out[str(fid_int)] = STATUS_MAP.get(status, status)
+                out[str(fid_int)] = SERIES_STATUS_MAP.get(status, status)
         except PlaymaxError:
             pass
         except Exception:
@@ -585,12 +591,6 @@ def series_status():
 @app.route("/api/my_fichas_status", methods=["POST"])
 def my_fichas_status():
     """Obtiene status de series del usuario en lotes, respetando throttle de API."""
-    STATUS_MAP = {
-        "finalized": "finished",
-        "emission": "in production",
-        "waiting for new season": "waiting for new season",
-        "cancelled": "cancelled",
-    }
     ids = (request.get_json(silent=True) or {}).get("ids", [])
     out = {}
     # Procesar en lotes pequeños (máximo 5 series por lote)
@@ -605,7 +605,7 @@ def my_fichas_status():
                 status = info.get("status")
                 ficha_type = info.get("type")
                 if ficha_type == "Serie" and status:
-                    out[str(fid_int)] = STATUS_MAP.get(status, status)
+                    out[str(fid_int)] = SERIES_STATUS_MAP.get(status, status)
             except Exception:
                 pass
     return jsonify(out)

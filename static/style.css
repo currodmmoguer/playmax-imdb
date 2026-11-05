@@ -54,6 +54,7 @@ button:hover { filter: brightness(1.1); }
 .card-info h3 { font-size: 0.95rem; margin-bottom: 4px; }
 .card-info p { font-size: 0.8rem; color: #9aa3af; }
 .pm-rating { color: #f5c518 !important; margin-top: 4px; }
+.series-status { margin-top: 4px; color: #cbd5e1 !important; }
 
 .empty { grid-column: 1/-1; text-align: center; color: #9aa3af; padding: 40px 0; }
 .pager { text-align: center; margin: 24px 0; }
