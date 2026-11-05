@@ -21,7 +21,7 @@ Aplicación web que compara las valoraciones de películas y series entre
 
 ```bash
 python3 -m venv venv
-./venv/bin/pip install flask requests
+./venv/bin/pip install -r requirements.txt
 ./venv/bin/python server.py
 ```
 
